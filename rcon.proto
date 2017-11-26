@@ -117,6 +117,8 @@ message SSL_RefereeRemoteControlRequest {
 	// appropriate for remote control software managed by a human operator,
 	// where no race condition is possible.
 	optional uint32 last_command_counter = 6;
+
+	optional string impl_id = 7;
 }
 
 // The TCP half-connection from referee box to controller carries a sequence of
@@ -152,6 +154,8 @@ message SSL_RefereeRemoteControlReply {
 		// The request was rejected because a card cannot be issued at this
 		// time.
 		BAD_CARD = 6;
+		// The request found no majority
+		NO_MAJORITY = 7;
 	}
 	required Outcome outcome = 2;
 };
