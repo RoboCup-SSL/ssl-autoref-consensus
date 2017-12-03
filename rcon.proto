@@ -154,8 +154,10 @@ message SSL_RefereeRemoteControlReply {
 		// The request was rejected because a card cannot be issued at this
 		// time.
 		BAD_CARD = 6;
-		// The request found no majority
+		// The request was rejected because it found no majority
 		NO_MAJORITY = 7;
+        // The request was rejected because the communication to the ssl-refbox failed
+        COMMUNICATION_FAILED = 8;
 	}
 	required Outcome outcome = 2;
 };
