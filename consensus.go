@@ -2,8 +2,7 @@ package main
 
 import (
 	"encoding/binary"
-	"errors"
-	"github.com/golang/protobuf/proto"
+	"github.com/pkg/errors"
 	"io"
 	"log"
 	"math"
@@ -36,19 +35,29 @@ func (r *ASyncRequest) TimedOut() bool {
 }
 
 func main() {
-	addr := ":10007"
-	ln, err := net.Listen("tcp", addr)
+	listeningAddr := ":10008"
+	refBoxAddr := "localhost:10007"
+
+	listener, err := net.Listen("tcp", listeningAddr)
 	if err != nil {
-		log.Fatalf("could not connect to %v", addr)
+		log.Fatalf("could not connect to %v", listeningAddr)
 	}
-	log.Printf("Listening on %s", addr)
+	defer listener.Close()
+	log.Printf("Listening on %s", listeningAddr)
+
+	refBoxConn, err := net.Dial("tcp", refBoxAddr)
+	if err != nil {
+		log.Fatalf("could not connect to refbox at %v", refBoxAddr)
+	}
+	defer refBoxConn.Close()
+	log.Printf("Connected to refbox at %v", refBoxAddr)
 
 	controlRequests := make(chan ASyncRequest)
 
-	go handleConsensus(controlRequests)
+	go handleConsensus(controlRequests, refBoxConn)
 
 	for {
-		if conn, err := ln.Accept(); err == nil {
+		if conn, err := listener.Accept(); err == nil {
 			go handleProtoClient(conn, controlRequests)
 		} else {
 			continue
@@ -56,7 +65,7 @@ func main() {
 	}
 }
 
-func handleConsensus(requests <-chan ASyncRequest) {
+func handleConsensus(requests <-chan ASyncRequest, refBoxConn net.Conn) {
 
 	reqBuffer := make([]*ASyncRequest, 0)
 
@@ -85,10 +94,21 @@ func handleConsensus(requests <-chan ASyncRequest) {
 		log.Printf("matching: %d", numMatching)
 		if numMatching > majority {
 			log.Printf("Found majority: %d/%d", numMatching, numClients)
-			// TODO actually sent the request out
+
+			var outcome SSL_RefereeRemoteControlReply_Outcome
+			if err := sendMessage(refBoxConn, request); err != nil {
+				log.Println("unable to send reply to refbox", err)
+			}
+			reply := new(SSL_RefereeRemoteControlReply)
+			if err := receiveMessage(refBoxConn, reply); err == nil {
+				outcome = reply.GetOutcome()
+			} else {
+				log.Println("unable to receive reply", err)
+				outcome = SSL_RefereeRemoteControlReply_NO_MAJORITY
+			}
 
 			for _, req := range matchingRequests {
-				req.Reply(SSL_RefereeRemoteControlReply_OK)
+				req.Reply(outcome)
 			}
 		}
 	}
@@ -114,7 +134,7 @@ func handleProtoClient(conn net.Conn, messages chan<- ASyncRequest) {
 
 	for {
 		err := handleRequest(conn, messages)
-		if err == io.EOF {
+		if errors.Cause(err) == io.EOF {
 			break
 		}
 		if err != nil {
@@ -124,25 +144,20 @@ func handleProtoClient(conn net.Conn, messages chan<- ASyncRequest) {
 
 	numClients--
 	log.Printf("Connection closed: %v", conn.RemoteAddr())
+	log.Printf("Now %d clients", numClients)
 }
 
 func handleRequest(conn net.Conn, requests chan<- ASyncRequest) (err error) {
-	dataLength, err := readDataLength(conn)
-	if err != nil {
-		return
-	}
-
-	data := make([]byte, dataLength)
-	n, err := conn.Read(data)
-	if err != nil || n != int(dataLength) {
-		return
-	}
 
 	request := new(SSL_RefereeRemoteControlRequest)
-	if err = proto.Unmarshal(data[0:n], request); err != nil {
-		return
+	if err := receiveMessage(conn, request); err != nil {
+		log.Println("unable to receive request from client", err)
+		return err
 	}
-	log.Println("Cmd: " + request.Command.String())
+	log.Println("Received message with id ", request.GetMessageId())
+	if request.Command != nil {
+		log.Println("Cmd: " + request.GetCommand().String())
+	}
 
 	cOutcome := make(chan SSL_RefereeRemoteControlReply_Outcome)
 	aSyncRequest := ASyncRequest{
@@ -166,18 +181,9 @@ func handleRequest(conn net.Conn, requests chan<- ASyncRequest) (err error) {
 		Outcome:   &outcome,
 	}
 
-	data, err = proto.Marshal(reply)
-	if err != nil {
-		log.Println("marshaling error: ", err)
-		return
-	}
-
-	if err = writeDataLength(conn, len(data)); err != nil {
-		return
-	}
-	n, err = conn.Write(data)
-	if err != nil || n != len(data) {
-		return
+	if err := sendMessage(conn, reply); err != nil {
+		log.Println("unable to send reply to client", err)
+		return err
 	}
 	return
 }
@@ -185,12 +191,11 @@ func handleRequest(conn net.Conn, requests chan<- ASyncRequest) (err error) {
 func readDataLength(conn net.Conn) (length uint32, err error) {
 	// The header is a 4 byte big endian uint32
 	header := make([]byte, 4)
-	h, err := conn.Read(header)
-	if err == nil && h == 4 {
-		length = binary.BigEndian.Uint32(header)
-	} else {
-		length = 0
+	if _, err := io.ReadFull(conn, header); err != nil {
+		log.Println("unable to read data length.", err)
+		return 0, err
 	}
+	length = binary.BigEndian.Uint32(header)
 	return
 }
 
