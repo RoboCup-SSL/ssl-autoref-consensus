@@ -1,11 +1,38 @@
 package main
 
 import (
+	"encoding/binary"
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
 	"io"
 	"net"
 )
+
+// read the data length from message header
+// The header is a 4 byte big endian uint32
+func readDataLength(conn net.Conn) (length uint32, err error) {
+	header := make([]byte, 4)
+	if _, err := io.ReadFull(conn, header); err != nil {
+		return 0, errors.Wrap(err, "unable to read data length")
+	}
+	length = binary.BigEndian.Uint32(header)
+	return
+}
+
+// write the data length to the message header
+// The header is a 4 byte big endian uint32
+func writeDataLength(conn net.Conn, dataLength int) error {
+	header := make([]byte, 4)
+	binary.BigEndian.PutUint32(header, uint32(dataLength))
+	n, err := conn.Write(header)
+	if err != nil {
+		return errors.Wrap(err, "unable to write data length")
+	}
+	if n != 4 {
+		return errors.New("invalid size written")
+	}
+	return nil
+}
 
 func sendMessage(conn net.Conn, message proto.Message) error {
 
