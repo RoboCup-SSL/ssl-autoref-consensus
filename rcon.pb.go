@@ -275,8 +275,10 @@ type SSL_RefereeRemoteControlRequest struct {
 	// appropriate for remote control software managed by a human operator,
 	// where no race condition is possible.
 	LastCommandCounter *uint32 `protobuf:"varint,6,opt,name=last_command_counter,json=lastCommandCounter" json:"last_command_counter,omitempty"`
-	ImplId             *string `protobuf:"bytes,7,opt,name=impl_id,json=implId" json:"impl_id,omitempty"`
-	XXX_unrecognized   []byte  `json:"-"`
+	// Pass a unique static identifier for each implementation (like each auto-ref implementation, test clients, etc)
+	// Used to identify the source of requests on the receiving side
+	ImplId           *string `protobuf:"bytes,7,opt,name=impl_id,json=implId" json:"impl_id,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
 }
 
 func (m *SSL_RefereeRemoteControlRequest) Reset()                    { *m = SSL_RefereeRemoteControlRequest{} }

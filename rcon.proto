@@ -118,6 +118,8 @@ message SSL_RefereeRemoteControlRequest {
 	// where no race condition is possible.
 	optional uint32 last_command_counter = 6;
 
+	// Pass a unique static identifier for each implementation (like each auto-ref implementation, test clients, etc)
+	// Used to identify the source of requests on the receiving side
 	optional string impl_id = 7;
 }
 
