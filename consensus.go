@@ -30,10 +30,12 @@ func main() {
 
 	refBoxConn, err := net.Dial("tcp", refBoxAddr)
 	if err != nil {
-		log.Fatalf("could not connect to refbox at %v", refBoxAddr)
+		log.Printf("could not connect to refbox at %v", refBoxAddr)
+		refBoxConn = nil
+	} else {
+		defer refBoxConn.Close()
+		log.Printf("Connected to refbox at %v", refBoxAddr)
 	}
-	defer refBoxConn.Close()
-	log.Printf("Connected to refbox at %v", refBoxAddr)
 
 	controlRequests := make(chan ASyncRequest)
 
@@ -81,15 +83,19 @@ func replyOnMajority(reqBuffer []*ASyncRequest, request *SSL_RefereeRemoteContro
 		*refboxRequest.MessageId = messageId
 		messageId++
 
-		outcome := SSL_RefereeRemoteControlReply_COMMUNICATION_FAILED
-		if err := sendMessage(refBoxConn, &refboxRequest); err != nil {
+		var outcome SSL_RefereeRemoteControlReply_Outcome
+		if refBoxConn == nil {
+			outcome = SSL_RefereeRemoteControlReply_OK
+		} else if err := sendMessage(refBoxConn, &refboxRequest); err != nil {
 			log.Println("unable to send reply to refbox", err)
+			outcome = SSL_RefereeRemoteControlReply_COMMUNICATION_FAILED
 		} else {
 			reply := new(SSL_RefereeRemoteControlReply)
 			if err := receiveMessage(refBoxConn, reply); err == nil {
 				outcome = reply.GetOutcome()
 			} else {
 				log.Println("unable to receive reply", err)
+				outcome = SSL_RefereeRemoteControlReply_COMMUNICATION_FAILED
 			}
 		}
 
