@@ -1,6 +1,8 @@
 package main
 
 import (
+	"github.com/RoboCup-SSL/ssl-go-tools/protoconn"
+	. "github.com/RoboCup-SSL/ssl-go-tools/sslproto"
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
 	"io"
@@ -12,7 +14,6 @@ import (
 
 const majorityTimeout = time.Second * 9
 const replyTimeout = time.Second * 10
-const positionToleranceMM = 100
 
 var numClients = 0
 var messageId = uint32(0)
@@ -86,12 +87,12 @@ func replyOnMajority(reqBuffer []*ASyncRequest, request *SSL_RefereeRemoteContro
 		var outcome SSL_RefereeRemoteControlReply_Outcome
 		if refBoxConn == nil {
 			outcome = SSL_RefereeRemoteControlReply_OK
-		} else if err := sendMessage(refBoxConn, &refboxRequest); err != nil {
+		} else if err := protoconn.SendMessage(refBoxConn, &refboxRequest); err != nil {
 			log.Println("unable to send reply to refbox", err)
 			outcome = SSL_RefereeRemoteControlReply_COMMUNICATION_FAILED
 		} else {
 			reply := new(SSL_RefereeRemoteControlReply)
-			if err := receiveMessage(refBoxConn, reply); err == nil {
+			if err := protoconn.ReceiveMessage(refBoxConn, reply); err == nil {
 				outcome = reply.GetOutcome()
 			} else {
 				log.Println("unable to receive reply", err)
@@ -154,7 +155,7 @@ func handleClientConnection(clientConn net.Conn, messages chan<- ASyncRequest) {
 func handleClientRequest(clientConnection net.Conn, requests chan<- ASyncRequest) error {
 
 	request := new(SSL_RefereeRemoteControlRequest)
-	if err := receiveMessage(clientConnection, request); err != nil {
+	if err := protoconn.ReceiveMessage(clientConnection, request); err != nil {
 		return errors.Wrap(err, "unable to receive request from client")
 	}
 
@@ -182,7 +183,7 @@ func handleClientRequest(clientConnection net.Conn, requests chan<- ASyncRequest
 		Outcome:   &outcome,
 	}
 
-	if err := sendMessage(clientConnection, reply); err != nil {
+	if err := protoconn.SendMessage(clientConnection, reply); err != nil {
 		return errors.Wrap(err, "unable to send reply to client")
 	}
 	return nil
