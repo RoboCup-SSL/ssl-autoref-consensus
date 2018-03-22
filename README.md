@@ -3,6 +3,7 @@ Build a consensus among multiple auto-referee implementations
 
 ## Requirements
  * Go - https://golang.org/
+ * https://github.com/RoboCup-SSL/ssl-go-tools (will be installed automatically with go-get)
 
 ## Getting Started
 
@@ -20,7 +21,6 @@ Make sure that you have added your GO_PATH to your system path.
 
 To rebuild: `go install`
 
-Update protobuf files: `./generateProto.sh`
-
 # Usage
-TBD
+
+Run the executable: `ssl-autoref-consensus`
