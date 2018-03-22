@@ -1,0 +1,13 @@
+language: go
+os: linux
+
+before_install:
+  - sudo apt-get update -qq
+  - sudo apt-get install git golang
+
+matrix:
+  include:
+    - sudo: required
+      dist: trusty
+
+script: go get -u github.com/RoboCup-SSL/ssl-autoref-consensus
