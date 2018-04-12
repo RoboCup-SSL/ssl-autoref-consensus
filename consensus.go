@@ -101,6 +101,7 @@ func replyOnMajority(reqBuffer []*ASyncRequest, request *SSL_RefereeRemoteContro
 		}
 
 		for _, req := range matchingRequests {
+			log.Println("reply: ", outcome)
 			req.Reply(outcome)
 		}
 
