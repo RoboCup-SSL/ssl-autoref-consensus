@@ -20,7 +20,7 @@ func (r *ASyncRequest) Reply(outcome sslproto.SSL_RefereeRemoteControlReply_Outc
 }
 
 func (r *ASyncRequest) TimedOut() bool {
-	return r.receiveTime.Add(majorityTimeout).Before(time.Now())
+	return r.receiveTime.Add(time.Second * time.Duration(*majorityTimeout)).Before(time.Now())
 }
 
 func findMatchingRequests(reqBuffer []*ASyncRequest, request *sslproto.SSL_RefereeRemoteControlRequest) []*ASyncRequest {

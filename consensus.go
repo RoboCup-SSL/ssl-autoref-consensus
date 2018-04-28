@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"github.com/RoboCup-SSL/ssl-go-tools/protoconn"
 	. "github.com/RoboCup-SSL/ssl-go-tools/sslproto"
 	"github.com/golang/protobuf/proto"
@@ -12,30 +13,31 @@ import (
 	"time"
 )
 
-const majorityTimeout = time.Second * 9
-const replyTimeout = time.Second * 10
+var majorityTimeout = flag.Int64("mt", 9, "Majority timeout in seconds")
+var replyTimeout = flag.Int64("rt", 10, "Reply timeout in seconds")
 
 var numClients = 0
 var messageId = uint32(0)
 
 func main() {
-	listeningAddr := ":10008"
-	refBoxAddr := "localhost:10007"
+	listeningAddr := flag.String("l", ":10008", "The listening address where the consensus is expecting requests from autoRefs")
+	refBoxAddr := flag.String("r", "localhost:10007", "The address of the ssl-refbox")
+	flag.Parse()
 
-	listener, err := net.Listen("tcp", listeningAddr)
+	listener, err := net.Listen("tcp", *listeningAddr)
 	if err != nil {
-		log.Fatalf("could not connect to %v", listeningAddr)
+		log.Fatalf("could not listen on %v", *listeningAddr)
 	}
 	defer listener.Close()
-	log.Printf("Listening on %s", listeningAddr)
+	log.Printf("Listening on %s", *listeningAddr)
 
-	refBoxConn, err := net.Dial("tcp", refBoxAddr)
+	refBoxConn, err := net.Dial("tcp", *refBoxAddr)
 	if err != nil {
-		log.Printf("could not connect to refbox at %v", refBoxAddr)
+		log.Printf("could not connect to refbox at %v", *refBoxAddr)
 		refBoxConn = nil
 	} else {
 		defer refBoxConn.Close()
-		log.Printf("Connected to refbox at %v", refBoxAddr)
+		log.Printf("Connected to refbox at %v", *refBoxAddr)
 	}
 
 	controlRequests := make(chan ASyncRequest)
@@ -174,7 +176,7 @@ func handleClientRequest(clientConnection net.Conn, requests chan<- ASyncRequest
 	select {
 	case res := <-cOutcome:
 		outcome = res
-	case <-time.After(replyTimeout):
+	case <-time.After(time.Duration(*replyTimeout) * time.Second):
 		log.Printf("No reply received")
 		outcome = SSL_RefereeRemoteControlReply_COMMUNICATION_FAILED
 	}
